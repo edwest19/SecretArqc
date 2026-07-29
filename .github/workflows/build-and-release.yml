@@ -12,7 +12,7 @@
 # Local-machine equivalents of what this file does (run from repo root):
 #   dotnet restore SecretArqc.sln
 #   dotnet test SecretArqc.Core.Tests/SecretArqc.Core.Tests.csproj -c Release
-#   dotnet publish SecretArqc.GenAc/SecretArqc.GenAc.csproj -c Release -r win-x64 --self-contained false -o publish/SecretArqc.GenAc
+#   dotnet publish SecretArqc.GenAc/SecretArqc.GenAc.csproj -c Release -r win-x64 --self-contained true -o publish/SecretArqc.GenAc
 #   winapp pack publish/SecretArqc.GenAc --manifest SecretArqc.GenAc/Package.appxmanifest --output SecretArqc.GenAc.msix
 # Run that sequence locally first and confirm SecretArqc.GenAc.msix appears
 # before trusting this workflow in CI.
@@ -107,12 +107,17 @@ jobs:
         run: dotnet test ${{ env.TEST_PROJECT_PATH }} --configuration ${{ env.CONFIGURATION }} --no-restore
         continue-on-error: false
 
-      - name: Publish app (framework-dependent, win-${{ env.PLATFORM }})
+      # --self-contained true: the WinUI3 template's Release config enables
+      # assembly trimming, which NETSDK1102 refuses to do for a
+      # framework-dependent publish. Self-contained is also the right
+      # choice here regardless, since users installing from GitHub
+      # Releases can't be assumed to have .NET 10 preinstalled.
+      - name: Publish app (self-contained, win-${{ env.PLATFORM }})
         run: >
           dotnet publish ${{ env.PROJECT_PATH }}
           -c ${{ env.CONFIGURATION }}
           -r win-${{ env.PLATFORM }}
-          --self-contained false
+          --self-contained true
           -o ${{ env.PUBLISH_DIR }}
 
       - name: Package MSIX (unsigned)
@@ -146,6 +151,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: unsigned-package
+          path: .
 
       - name: Azure login (OIDC, no stored secret)
         uses: azure/login@v2
@@ -157,9 +163,9 @@ jobs:
       - name: Sign with Azure Artifact Signing
         uses: azure/trusted-signing-action@v1
         with:
-          endpoint: https://<region>.codesigning.azure.net   # <-- fill in your endpoint region
-          trusted-signing-account-name: <your-account-name>   # <-- fill in
-          certificate-profile-name: <your-cert-profile-name>  # <-- fill in
+          endpoint: https://eastus.codesigning.azure.net   # <-- fill in your endpoint region
+          trusted-signing-account-name: edwest19   # <-- fill in
+          certificate-profile-name: CodeSigning-Apps  # <-- fill in
           files-folder: ${{ github.workspace }}
           files-folder-filter: msix
           files-folder-recurse: false

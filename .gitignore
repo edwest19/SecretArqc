@@ -72,3 +72,5 @@ BundleArtifacts/
 *.p12
 *.cer
 *.key
+
+publish/
