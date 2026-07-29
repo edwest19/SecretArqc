@@ -55,3 +55,20 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# --- MSIX / AppX packaging output (WinUI3) ---
+Packages/
+AppPackages/
+BundleArtifacts/
+*.msix
+*.msixbundle
+*.msixupload
+*.appxsym
+*.appxupload
+*.appinstaller
+
+# --- Signing material (never commit) ---
+*.pfx
+*.p12
+*.cer
+*.key
