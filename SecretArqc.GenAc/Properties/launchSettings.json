@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "SecretArqc.GenAc (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "SecretArqc.GenAc (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

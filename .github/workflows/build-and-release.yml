@@ -1,0 +1,172 @@
+# .github/workflows/build-and-release.yml
+#
+# Build -> Test -> Package (MSIX via winapp CLI) -> Sign (Azure Artifact
+# Signing) -> GitHub Release
+#
+# Written for a VS Code + CLI-only workflow end to end - including CI.
+# No Visual Studio, no msbuild.exe, no separately-installed Build Tools.
+# Packaging uses the winapp CLI (https://github.com/microsoft/winappCli),
+# Microsoft's first-party CLI for MSIX identity/packaging, installed on
+# the runner via the official microsoft/setup-WinAppCli action.
+#
+# Local-machine equivalents of what this file does (run from repo root):
+#   dotnet restore SecretArqc.sln
+#   dotnet test SecretArqc.Core.Tests/SecretArqc.Core.Tests.csproj -c Release
+#   dotnet publish SecretArqc.GenAc/SecretArqc.GenAc.csproj -c Release -r win-x64 --self-contained false -o publish/SecretArqc.GenAc
+#   winapp pack publish/SecretArqc.GenAc --manifest SecretArqc.GenAc/Package.appxmanifest --output SecretArqc.GenAc.msix
+# Run that sequence locally first and confirm SecretArqc.GenAc.msix appears
+# before trusting this workflow in CI.
+#
+# SEQUENCE THIS WAS DESIGNED FOR:
+#   1. Run this against the *blank* scaffolded WinUI3 app first, with
+#      RUN_SIGNING set to 'false' (repo variable) so you can prove the
+#      build+package steps work before touching Azure at all.
+#   2. Flip RUN_SIGNING to 'true' once your Azure federated credential
+#      and secrets are in place, and confirm signing succeeds on the
+#      blank app.
+#   3. Only then swap PROJECT_PATH/MANIFEST_PATH to point at the ported
+#      SecretArqc project (after the SecretEmv -> SecretArqc namespace
+#      rename) and re-run the whole thing.
+#
+# REQUIRED REPO CONFIGURATION (Settings > Secrets and variables > Actions):
+#   Secrets:
+#     AZURE_CLIENT_ID        - App registration (federated credential) client ID
+#     AZURE_TENANT_ID        - Entra tenant ID
+#     AZURE_SUBSCRIPTION_ID  - Subscription containing the Artifact Signing account
+#   Variables:
+#     RUN_SIGNING            - 'true' or 'false'
+#
+# You must have already configured a federated credential on the Azure
+# app registration scoped to this repo (Settings > Certificates & secrets
+# > Federated credentials), subject e.g.:
+#   repo:<owner>/SecretArqc:ref:refs/heads/main
+# This avoids storing any client secret in GitHub at all.
+#
+# NOTE ON SIGNING: winapp pack's own --cert flag signs with a *local*
+# certificate file (e.g. a dev cert) - it has no concept of Azure Artifact
+# Signing's cloud/HSM-based signing, where the private key never leaves
+# Azure. So we deliberately run `winapp pack` WITHOUT --cert to produce an
+# unsigned .msix, then sign that file separately via the Azure signing
+# action below. Confirm the current action name/version in the GitHub
+# Marketplace before relying on this in production - it has moved between
+# "Trusted Signing" and "Artifact Signing" branding.
+#
+# NOTE ON PUBLISHER IDENTITY: the Publisher in Package.appxmanifest must
+# exactly match your Azure Artifact Signing certificate profile's Subject
+# (case-sensitive) or signing/updates will break. Check this before your
+# first real signed run.
+
+name: Build, Sign, and Release SecretArqc
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      run_signing:
+        description: "Override RUN_SIGNING for this manual run (true/false)"
+        required: false
+        default: ""
+
+permissions:
+  id-token: write   # required for OIDC login to Azure (no stored client secret)
+  contents: write   # required to publish a GitHub Release
+
+env:
+  SOLUTION_PATH: SecretArqc.sln
+  PROJECT_PATH: SecretArqc.GenAc/SecretArqc.GenAc.csproj
+  MANIFEST_PATH: SecretArqc.GenAc/Package.appxmanifest
+  TEST_PROJECT_PATH: SecretArqc.Core.Tests/SecretArqc.Core.Tests.csproj
+  PUBLISH_DIR: publish/SecretArqc.GenAc
+  PACKAGE_NAME: SecretArqc.GenAc.msix
+  PLATFORM: x64
+  CONFIGURATION: Release
+
+jobs:
+  build-and-package:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      # Official Microsoft action - installs the winapp CLI used for
+      # MSIX packaging below. No VS/Build Tools install involved.
+      - name: Setup WinApp CLI
+        uses: microsoft/setup-WinAppCli@v0.1
+
+      - name: Restore
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
+
+      - name: Run tests
+        run: dotnet test ${{ env.TEST_PROJECT_PATH }} --configuration ${{ env.CONFIGURATION }} --no-restore
+        continue-on-error: false
+
+      - name: Publish app (framework-dependent, win-${{ env.PLATFORM }})
+        run: >
+          dotnet publish ${{ env.PROJECT_PATH }}
+          -c ${{ env.CONFIGURATION }}
+          -r win-${{ env.PLATFORM }}
+          --self-contained false
+          -o ${{ env.PUBLISH_DIR }}
+
+      - name: Package MSIX (unsigned)
+        run: >
+          winapp pack ${{ env.PUBLISH_DIR }}
+          --manifest ${{ env.MANIFEST_PATH }}
+          --output ${{ env.PACKAGE_NAME }}
+
+      - name: Verify package was created
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${{ env.PACKAGE_NAME }}")) {
+            Write-Error "Package not found - check the 'Package MSIX' step output above."
+            exit 1
+          }
+
+      - name: Upload unsigned package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-package
+          path: ${{ env.PACKAGE_NAME }}
+
+  sign-and-release:
+    needs: build-and-package
+    runs-on: windows-latest
+    if: ${{ (github.event.inputs.run_signing || vars.RUN_SIGNING) == 'true' }}
+    env:
+      PACKAGE_NAME: SecretArqc.GenAc.msix
+    steps:
+      - name: Download package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: unsigned-package
+
+      - name: Azure login (OIDC, no stored secret)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign with Azure Artifact Signing
+        uses: azure/trusted-signing-action@v1
+        with:
+          endpoint: https://<region>.codesigning.azure.net   # <-- fill in your endpoint region
+          trusted-signing-account-name: <your-account-name>   # <-- fill in
+          certificate-profile-name: <your-cert-profile-name>  # <-- fill in
+          files-folder: ${{ github.workspace }}
+          files-folder-filter: msix
+          files-folder-recurse: false
+
+      - name: Create GitHub Release with signed package
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.PACKAGE_NAME }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
