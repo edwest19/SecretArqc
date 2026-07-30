@@ -8,16 +8,16 @@
   xmlns:systemai="http://schemas.microsoft.com/appx/manifest/systemai/windows10"
   IgnorableNamespaces="uap rescap systemai">
 
-  <Identity
-    Name="86271F2D-2B86-448E-9B4C-5C41A4E7F315"
-    Publisher="CN=AppPublisher"
-    Version="1.0.0.0" />
+<Identity
+  Name="86271F2D-2B86-448E-9B4C-5C41A4E7F315"
+  Publisher="CN=Edwin West, O=Edwin West, L=Huntington, S=ny, C=US"
+  Version="1.0.0.0" />
 
   <mp:PhoneIdentity PhoneProductId="86271F2D-2B86-448E-9B4C-5C41A4E7F315" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
     <DisplayName>SecretArqc.GenAc</DisplayName>
-    <PublisherDisplayName>AppPublisher</PublisherDisplayName>
+    <PublisherDisplayName>Edwin West</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
