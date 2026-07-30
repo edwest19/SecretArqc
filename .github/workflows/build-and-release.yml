@@ -184,7 +184,7 @@ jobs:
       - name: Sign with Azure Artifact Signing
         uses: azure/trusted-signing-action@v1
         with:
-          endpoint: https://eastus.codesigning.azure.net
+          endpoint: https://eus.codesigning.azure.net
           trusted-signing-account-name: edwest19
           certificate-profile-name: CodeSigning-Apps
           files-folder: ${{ github.workspace }}
