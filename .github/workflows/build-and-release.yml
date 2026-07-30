@@ -10,7 +10,7 @@
 # the runner via the official microsoft/setup-WinAppCli action.
 #
 # Local-machine equivalents of what this file does (run from repo root):
-#   dotnet restore SecretArqc.sln
+#   dotnet restore SecretArqc.slnx
 #   dotnet test SecretArqc.Core.Tests/SecretArqc.Core.Tests.csproj -c Release
 #   dotnet publish SecretArqc.GenAc/SecretArqc.GenAc.csproj -c Release -r win-x64 --self-contained true -o publish/SecretArqc.GenAc
 #   winapp pack publish/SecretArqc.GenAc --manifest SecretArqc.GenAc/Package.appxmanifest --output SecretArqc.GenAc.msix
@@ -76,7 +76,7 @@ permissions:
   contents: write   # required to publish a GitHub Release
 
 env:
-  SOLUTION_PATH: SecretArqc.sln
+  SOLUTION_PATH: SecretArqc.slnx
   PROJECT_PATH: SecretArqc.GenAc/SecretArqc.GenAc.csproj
   MANIFEST_PATH: SecretArqc.GenAc/Package.appxmanifest
   TEST_PROJECT_PATH: SecretArqc.Core.Tests/SecretArqc.Core.Tests.csproj
@@ -105,9 +105,23 @@ jobs:
       - name: Restore
         run: dotnet restore ${{ env.SOLUTION_PATH }}
 
+      # Core.Tests doesn't exist until the EMV code is ported in (Phase 4).
+      # Skip gracefully rather than fail the whole pipeline on a project
+      # that isn't built yet - but once it exists, this always runs it.
+      - name: Check for test project
+        id: check_tests
+        shell: pwsh
+        run: |
+          if (Test-Path "${{ env.TEST_PROJECT_PATH }}") {
+            echo "exists=true" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "exists=false" >> $env:GITHUB_OUTPUT
+            Write-Warning "Test project not found at ${{ env.TEST_PROJECT_PATH }} - skipping. Expected until Core.Tests is ported in."
+          }
+
       - name: Run tests
+        if: steps.check_tests.outputs.exists == 'true'
         run: dotnet test ${{ env.TEST_PROJECT_PATH }} --configuration ${{ env.CONFIGURATION }} --no-restore
-        continue-on-error: false
 
       # --self-contained true: the WinUI3 template's Release config enables
       # assembly trimming, which NETSDK1102 refuses to do for a
