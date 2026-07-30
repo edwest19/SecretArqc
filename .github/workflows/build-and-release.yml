@@ -37,10 +37,12 @@
 #     RUN_SIGNING            - 'true' or 'false'
 #
 # You must have already configured a federated credential on the Azure
-# app registration scoped to this repo (Settings > Certificates & secrets
-# > Federated credentials), subject e.g.:
-#   repo:<owner>/SecretArqc:ref:refs/heads/main
-# This avoids storing any client secret in GitHub at all.
+# app registration scoped to a GitHub Environment (not a branch/tag ref -
+# Azure federated credentials can't wildcard-match tags), subject:
+#   repo:<owner>/SecretArqc:environment:release
+# This avoids storing any client secret in GitHub at all. The GitHub
+# Environment named "release" must exist in this repo's Settings >
+# Environments, and the sign-and-release job below is scoped to it.
 #
 # NOTE ON SIGNING: winapp pack's own --cert flag signs with a *local*
 # certificate file (e.g. a dev cert) - it has no concept of Azure Artifact
@@ -143,6 +145,12 @@ jobs:
   sign-and-release:
     needs: build-and-package
     runs-on: windows-latest
+    # Tied to a GitHub Environment (not a branch/tag ref) because Azure
+    # federated credentials cannot wildcard-match tag refs - each exact
+    # tag would otherwise need its own credential. The environment name
+    # is what the federated credential's Subject is scoped to in Azure,
+    # not "refs/heads/main" or any specific tag.
+    environment: release
     if: ${{ (github.event.inputs.run_signing || vars.RUN_SIGNING) == 'true' }}
     env:
       PACKAGE_NAME: SecretArqc.GenAc.msix
@@ -151,7 +159,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: unsigned-package
-          path: .
 
       - name: Azure login (OIDC, no stored secret)
         uses: azure/login@v2
@@ -163,9 +170,9 @@ jobs:
       - name: Sign with Azure Artifact Signing
         uses: azure/trusted-signing-action@v1
         with:
-          endpoint: https://eastus.codesigning.azure.net   # <-- fill in your endpoint region
-          trusted-signing-account-name: edwest19   # <-- fill in
-          certificate-profile-name: CodeSigning-Apps  # <-- fill in
+          endpoint: https://eastus.codesigning.azure.net
+          trusted-signing-account-name: edwest19
+          certificate-profile-name: CodeSigning-Apps
           files-folder: ${{ github.workspace }}
           files-folder-filter: msix
           files-folder-recurse: false
