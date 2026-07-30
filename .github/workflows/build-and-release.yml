@@ -82,8 +82,8 @@ env:
   TEST_PROJECT_PATH: SecretArqc.Core.Tests/SecretArqc.Core.Tests.csproj
   PUBLISH_DIR: publish/SecretArqc.GenAc
   PACKAGE_NAME: SecretArqc.GenAc.msix
-  PLATFORM: x64
-  CONFIGURATION: Release
+  BUILD_PLATFORM: x64
+  BUILD_CONFIGURATION: Release
 
 jobs:
   build-and-package:
@@ -121,18 +121,18 @@ jobs:
 
       - name: Run tests
         if: steps.check_tests.outputs.exists == 'true'
-        run: dotnet test ${{ env.TEST_PROJECT_PATH }} --configuration ${{ env.CONFIGURATION }} --no-restore
+        run: dotnet test ${{ env.TEST_PROJECT_PATH }} --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
       # --self-contained true: the WinUI3 template's Release config enables
       # assembly trimming, which NETSDK1102 refuses to do for a
       # framework-dependent publish. Self-contained is also the right
       # choice here regardless, since users installing from GitHub
       # Releases can't be assumed to have .NET 10 preinstalled.
-      - name: Publish app (self-contained, win-${{ env.PLATFORM }})
+      - name: Publish app (self-contained, win-${{ env.BUILD_PLATFORM }})
         run: >
           dotnet publish ${{ env.PROJECT_PATH }}
-          -c ${{ env.CONFIGURATION }}
-          -r win-${{ env.PLATFORM }}
+          -c ${{ env.BUILD_CONFIGURATION }}
+          -r win-${{ env.BUILD_PLATFORM }}
           --self-contained true
           -o ${{ env.PUBLISH_DIR }}
 
