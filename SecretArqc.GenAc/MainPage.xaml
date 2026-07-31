@@ -6,13 +6,490 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:local="using:SecretArqc_GenAc"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    mc:Ignorable="d">
+    mc:Ignorable="d"
+    Background="{ThemeResource LayerFillColorDefaultBrush}">
 
-    <!--
-        This is the main content area of your application.
-        Add your UI elements here — for example, controls, layouts, and data-bound views.
-        Use 'dotnet new winui-page' to create additional pages and navigate to them via
-        the Frame in MainWindow (RootFrame).
-    -->
-    <Grid />
+    <Page.Resources>
+        <!-- Output TextBox Style (read-only with different background) -->
+        <Style x:Key="OutputTextBoxStyle" TargetType="TextBox">
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="Background" Value="{ThemeResource LayerFillColorAltBrush}"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <!-- Input TextBox Style (monospace for hex) -->
+        <Style x:Key="HexTextBoxStyle" TargetType="TextBox">
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <!-- Section Header Style -->
+        <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <!-- Card Style for sections -->
+        <Style x:Key="CardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}"/>
+            <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="16"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+        </Style>
+    </Page.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Padding="20">
+        <StackPanel MaxWidth="900" HorizontalAlignment="Center">
+
+            <!-- Header with Config Buttons -->
+            <Grid Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE72E;" FontSize="22"/>
+                        <TextBlock Text="EMV ARQC/ARPC Generator"
+                                   FontSize="24"
+                                   FontWeight="Bold"/>
+                    </StackPanel>
+                    <TextBlock x:Name="TxtConfigStatus"
+                               Text="Ready"
+                               FontSize="12"
+                               Margin="0,4,0,0"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1"
+                           Orientation="Horizontal"
+                           Spacing="8"
+                           VerticalAlignment="Center">
+                    <Button Click="SaveConfig_Click"
+                            ToolTipService.ToolTip="Save configuration to file">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE74E;" FontSize="14"/>
+                            <TextBlock Text="Save As..."/>
+                        </StackPanel>
+                    </Button>
+                    <Button Click="LoadConfig_Click"
+                            ToolTipService.ToolTip="Load configuration from file">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE8DA;" FontSize="14"/>
+                            <TextBlock Text="Load..."/>
+                        </StackPanel>
+                    </Button>
+                    <Button Click="ClearAll_Click"
+                            ToolTipService.ToolTip="Clear all fields and reset">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE74D;" FontSize="14"/>
+                            <TextBlock Text="Clear All"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <!-- Configuration Section -->
+            <Border Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE713;" FontSize="16"/>
+                        <TextBlock Text="Configuration" Style="{StaticResource SectionHeaderStyle}"/>
+                    </StackPanel>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Block Cipher -->
+                        <TextBlock Grid.Row="0"
+                                   Grid.Column="0"
+                                   Text="Block Cipher:"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,12,0"/>
+                        <StackPanel Grid.Row="0"
+                                   Grid.Column="1"
+                                   Orientation="Horizontal"
+                                   Spacing="16">
+                            <RadioButton x:Name="Rb3Des"
+                                        Content="3DES"
+                                        IsChecked="True"
+                                        Checked="BlockCipher_Checked"/>
+                            <RadioButton x:Name="RbAes"
+                                        Content="AES"
+                                        Checked="BlockCipher_Checked"/>
+                        </StackPanel>
+
+                        <!-- Derivation Method (3DES Options) -->
+                        <TextBlock Grid.Row="1"
+                                   Grid.Column="0"
+                                   Text="Derivation:"
+                                   VerticalAlignment="Center"
+                                   Margin="0,8,12,0"/>
+                        <StackPanel Grid.Row="1"
+                                   Grid.Column="1"
+                                   Orientation="Horizontal"
+                                   Spacing="16"
+                                   Margin="0,8,0,0">
+                            <RadioButton x:Name="Rb3DesOptionA"
+                                        Content="Option A (PAN ≤ 16)"
+                                        IsEnabled="False"/>
+                            <RadioButton x:Name="Rb3DesOptionB"
+                                        Content="Option B (PAN > 16)"
+                                        IsEnabled="False"/>
+                            <RadioButton x:Name="RbAesOption3"
+                                        Content="Option 3 (AES-CMAC)"
+                                        IsEnabled="False"/>
+                        </StackPanel>
+
+                        <!-- AES Key Length (separate row) -->
+                        <StackPanel Grid.Row="2"
+                                   Grid.Column="1"
+                                   x:Name="AesKeyLengthPanel"
+                                   Visibility="Collapsed"
+                                   Orientation="Horizontal"
+                                   Spacing="8"
+                                   Margin="0,8,0,0">
+                            <TextBlock Text="AES Key Length:"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,8,0"/>
+                            <RadioButton x:Name="RbAes128"
+                                        Content="128-bit"
+                                        IsChecked="True"
+                                        Checked="AesKeyLength_Checked"/>
+                            <RadioButton x:Name="RbAes192"
+                                        Content="192-bit"
+                                        Checked="AesKeyLength_Checked"/>
+                            <RadioButton x:Name="RbAes256"
+                                        Content="256-bit"
+                                        Checked="AesKeyLength_Checked"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- 1. Master Key Section -->
+            <Border Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="1. Master Key" Style="{StaticResource SectionHeaderStyle}"/>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- IMK-AC -->
+                        <TextBlock Grid.Row="0"
+                                   Grid.Column="0"
+                                   Text="IMK-AC"
+                                   VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="0"
+                                 Grid.Column="1"
+                                 x:Name="TxtImkAc"
+                                 Style="{StaticResource HexTextBoxStyle}"
+                                 TextChanged="ImkAc_TextChanged"
+                                 LostFocus="HexTextBox_LostFocus"
+                                 PlaceholderText="Enter Issuer Master Key (hex)"/>
+                        <TextBlock Grid.Row="0"
+                                   Grid.Column="2"
+                                   x:Name="TxtImkKcv"
+                                   VerticalAlignment="Center"
+                                   Margin="8,0,0,0"
+                                   FontSize="11"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                        <!-- PAN -->
+                        <TextBlock Grid.Row="1"
+                                  Text="PAN"
+                                  VerticalAlignment="Center"
+                                  Margin="0,8,0,0"/>
+                        <TextBox Grid.Row="1"
+                                 Grid.Column="1"
+                                 x:Name="TxtPan"
+                                 Style="{StaticResource HexTextBoxStyle}"
+                                 TextChanged="Pan_TextChanged"
+                                 LostFocus="HexTextBox_LostFocus"
+                                 PlaceholderText="Primary Account Number"
+                                 Margin="0,8,0,0"/>
+
+                        <!-- PSN -->
+                        <TextBlock Grid.Row="1"
+                                  Grid.Column="2"
+                                  Text="PSN"
+                                  VerticalAlignment="Center"
+                                  Margin="16,8,8,0"/>
+                        <TextBox Grid.Row="1"
+                                Grid.Column="2"
+                                x:Name="TxtPsn"
+                                Width="60"
+                                Style="{StaticResource HexTextBoxStyle}"
+                                LostFocus="HexTextBox_LostFocus"
+                                PlaceholderText=""
+                                MaxLength="2"
+                                Margin="48,8,0,0"/>
+
+                        <!-- Generate Button -->
+                        <Button Grid.Row="2"
+                               Grid.Column="1"
+                               Click="GenerateCardMasterKey_Click"
+                               Margin="0,12,0,0">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="Generate"/>
+                                <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE768;" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Output -->
+                        <TextBlock Grid.Row="3"
+                                  Text="MK-AC"
+                                  VerticalAlignment="Center"
+                                  Margin="0,12,0,0"/>
+                        <TextBox Grid.Row="3"
+                                Grid.Column="1"
+                                Grid.ColumnSpan="2"
+                                x:Name="TxtCardMasterKey"
+                                Style="{StaticResource OutputTextBoxStyle}"
+                                Margin="0,12,0,0"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- 2. Session Key Section -->
+            <Border Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="2. Session Key" Style="{StaticResource SectionHeaderStyle}"/>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- ATC -->
+                        <TextBlock Text="ATC" VerticalAlignment="Center"/>
+                        <TextBox Grid.Column="1"
+                                x:Name="TxtAtc"
+                                Style="{StaticResource HexTextBoxStyle}"
+                                LostFocus="HexTextBox_LostFocus"
+                                PlaceholderText="Application Transaction Counter (hex)"/>
+
+                        <!-- Generate Button -->
+                        <Button Grid.Row="1"
+                               Grid.Column="1"
+                               Click="GenerateSessionKey_Click"
+                               Margin="0,12,0,0">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="Generate"/>
+                                <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE768;" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Output -->
+                        <TextBlock Grid.Row="2"
+                                  Text="SK-AC"
+                                  VerticalAlignment="Center"
+                                  Margin="0,12,0,0"/>
+                        <TextBox Grid.Row="2"
+                                Grid.Column="1"
+                                x:Name="TxtSessionKey"
+                                Style="{StaticResource OutputTextBoxStyle}"
+                                Margin="0,12,0,0"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- 3. ARQC & ARPC Section -->
+            <Border Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="3. ARQC &amp; ARPC" Style="{StaticResource SectionHeaderStyle}"/>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- DOL -->
+                        <TextBlock Text="DOL" VerticalAlignment="Center"/>
+                        <TextBox Grid.Column="1"
+                                x:Name="TxtDol"
+                                Style="{StaticResource HexTextBoxStyle}"
+                                TextChanged="TxtDol_TextChanged"
+                                PlaceholderText="Data Object List (hex) or TLV data"/>
+
+                        <!-- Tag Values -->
+                        <TextBlock Grid.Row="1"
+                                  Text="Tag Values"
+                                  VerticalAlignment="Top"
+                                  Margin="0,8,0,0"/>
+                        <TextBox Grid.Row="1"
+                                Grid.Column="1"
+                                x:Name="TxtTagValues"
+                                Style="{StaticResource HexTextBoxStyle}"
+                                LostFocus="HexTextBox_LostFocus"
+                                AcceptsReturn="True"
+                                TextWrapping="Wrap"
+                                Height="80"
+                                VerticalAlignment="Top"
+                                PlaceholderText="Concatenated tag values (hex)"
+                                Margin="0,8,0,0"/>
+
+                        <!-- ARC -->
+                        <TextBlock Grid.Row="2"
+                                  Text="ARC / CRU"
+                                  VerticalAlignment="Center"
+                                  Margin="0,8,0,0"/>
+                        <TextBox Grid.Row="2"
+                                Grid.Column="1"
+                                x:Name="TxtArc"
+                                Text=""
+                                Style="{StaticResource HexTextBoxStyle}"
+                                LostFocus="HexTextBox_LostFocus"
+                                PlaceholderText="Authorization Response Code / Card Response Update (4 bytes hex)"
+                                Margin="0,8,0,0"/>
+
+                        <!-- Generate Buttons -->
+                        <StackPanel Grid.Row="3"
+                                   Grid.Column="1"
+                                   Orientation="Horizontal"
+                                   Spacing="12"
+                                   Margin="0,12,0,0">
+                            <Button Click="GenerateArqc_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="Generate ARQC"/>
+                                    <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE768;" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Click="GenerateArpc_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="Generate ARPC"/>
+                                    <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE768;" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+
+                        <!-- ARQC Output -->
+                        <TextBlock Grid.Row="4"
+                                  Text="ARQC"
+                                  VerticalAlignment="Center"
+                                  Margin="0,12,0,0"/>
+                        <Grid Grid.Row="4"
+                             Grid.Column="1"
+                             Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="TxtArqc"
+                                    Style="{StaticResource OutputTextBoxStyle}"/>
+                            <FontIcon Grid.Column="1"
+                                      x:Name="TxtArqcStatus"
+                                      FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                      VerticalAlignment="Center"
+                                      Margin="8,0,0,0"
+                                      FontSize="16"
+                                      Visibility="Collapsed"/>
+                        </Grid>
+
+                        <!-- ARPC Output -->
+                        <TextBlock Grid.Row="5"
+                                  Text="ARPC"
+                                  VerticalAlignment="Center"
+                                  Margin="0,8,0,0"/>
+                        <Grid Grid.Row="5"
+                             Grid.Column="1"
+                             Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="TxtArpc"
+                                    Style="{StaticResource OutputTextBoxStyle}"/>
+                            <FontIcon Grid.Column="1"
+                                      x:Name="TxtArpcStatus"
+                                      FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                      VerticalAlignment="Center"
+                                      Margin="8,0,0,0"
+                                      FontSize="16"
+                                      Visibility="Collapsed"/>
+                        </Grid>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Log Section (Collapsible) -->
+            <Expander IsExpanded="False"
+                     HorizontalAlignment="Stretch"
+                     HorizontalContentAlignment="Stretch">
+                <Expander.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE81C;" FontSize="14"/>
+                        <TextBlock Text="Process Log"/>
+                    </StackPanel>
+                </Expander.Header>
+                <Border Background="{ThemeResource LayerFillColorAltBrush}"
+                       BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                       BorderThickness="1"
+                       CornerRadius="4"
+                       Padding="12"
+                       Margin="0,8,0,0">
+                    <ScrollViewer Height="200"
+                                 VerticalScrollBarVisibility="Auto">
+                        <TextBox x:Name="TxtLog"
+                                IsReadOnly="True"
+                                AcceptsReturn="True"
+                                TextWrapping="Wrap"
+                                BorderThickness="0"
+                                Background="Transparent"
+                                FontFamily="Consolas"
+                                FontSize="11"/>
+                    </ScrollViewer>
+                </Border>
+            </Expander>
+
+            <!-- Footer -->
+            <StackPanel Orientation="Horizontal"
+                       Spacing="12"
+                       Margin="0,20,0,20">
+                <Button Content="Close"
+                       Click="Close_Click"
+                       MinWidth="100"/>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
 </Page>
