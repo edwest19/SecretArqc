@@ -13,7 +13,7 @@
 #   dotnet restore SecretArqc.slnx
 #   dotnet test SecretArqc.Core.Tests/SecretArqc.Core.Tests.csproj -c Release
 #   dotnet publish SecretArqc.GenAc/SecretArqc.GenAc.csproj -c Release -r win-x64 --self-contained true -o publish/SecretArqc.GenAc
-#   winapp pack publish/SecretArqc.GenAc --manifest SecretArqc.GenAc/Package.appxmanifest --output SecretArqc.GenAc.msix
+#   winapp pack publish/SecretArqc.GenAc --manifest SecretArqc.GenAc/Package.appxmanifest --executable SecretArqc.GenAc.exe --output SecretArqc.GenAc.msix
 # Run that sequence locally first and confirm SecretArqc.GenAc.msix appears
 # before trusting this workflow in CI.
 #
@@ -136,10 +136,14 @@ jobs:
           --self-contained true
           -o ${{ env.PUBLISH_DIR }}
 
+      # --executable: WindowsAppSdkSelfContained bundles extra .exe files
+      # from the Windows App SDK runtime alongside the app's own, so
+      # winapp pack's auto-detection (exactly one .exe) is ambiguous now.
       - name: Package MSIX (unsigned)
         run: >
           winapp pack ${{ env.PUBLISH_DIR }}
           --manifest ${{ env.MANIFEST_PATH }}
+          --executable SecretArqc.GenAc.exe
           --output ${{ env.PACKAGE_NAME }}
 
       - name: Verify package was created
