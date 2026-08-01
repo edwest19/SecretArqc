@@ -67,6 +67,12 @@ BundleArtifacts/
 *.appxupload
 *.appinstaller
 
+# --- Portable CLI tool output (self-contained single-file exes) ---
+# These are build output, same reasoning as the MSIX above - never commit
+# a compiled binary to a source repo. The CI workflow copies these to the
+# repo root temporarily before signing; they should never be checked in.
+*.exe
+
 # --- Signing material (never commit) ---
 *.pfx
 *.p12
